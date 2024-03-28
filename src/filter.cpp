@@ -1,64 +1,93 @@
 /**
 * Implementation of KalmanFilter class.
 *
-* @author: Hayk Martirosyan
-* @date: 2014.11.15
+* @author: sanghao97 
+* @date: 2024.03.26
 */
 
-#include <iostream>
 
 #include "filter.h"
 
-KalmanFilter::KalmanFilter(
-    double dt,
-    const Eigen::MatrixXd& A,
-    const Eigen::MatrixXd& C,
-    const Eigen::MatrixXd& Q,
-    const Eigen::MatrixXd& R,
-    const Eigen::MatrixXd& P)
-  : A(A), C(C), Q(Q), R(R), P0(P),
-    m(C.rows()), n(A.rows()), dt(dt), initialized(false),
-    I(n, n), x_hat(n), x_hat_new(n)
+KalmanFilter::KalmanFilter()
 {
-    I.setIdentity();
+    // Initialize the state and covariance matrices
 }
 
-KalmanFilter::KalmanFilter() {}
+KalmanFilter::~KalmanFilter() {}
 
-void KalmanFilter::init(double t0, const Eigen::VectorXd& x0) {
-    x_hat = x0;
-    P = P0;
-    this->t0 = t0;
-    t = t0;
-    initialized = true;
+
+void KalmanFilter::init(double t0, const Eigen::VectorXd& x0, const Eigen::MatrixXd& P0)
+{
+    // Initialize the state and covariance matrices
+    time_stamp_ = t0;
+    X_ = x0;
+    P_ = P0;
+    initialized_ = true;
 }
 
-void KalmanFilter::init() {
-    x_hat.setZero();
-    P = P0;
-    t0 = 0;
-    t = t0;
-    initialized = true;
+void KalmanFilter::check_system_resonable()
+{
+    // Check if the filter is valid 
+    if (delta_time_ <= 0)
+    {
+        system_resonable_ = false;
+        return;
+    }
+    if (A_.rows()!= X_.size() || A_.rows()!= X_.size())
+    {
+        system_resonable_ = false;
+        return;
+    }
+    if (B_.rows()!= X_.size() || B_.cols()!= u_.size())
+    {
+        system_resonable_ = false;
+        return;
+    }
+    if (F_.rows()!= X_.cols() || F_.cols()!= Q_.rows())
+    {
+        system_resonable_ = false;
+        return;
+    }
+    if (Q_.rows() != Q_.cols())
+    {
+        system_resonable_ = false;
+        return;
+    }
+    system_resonable_ = true;
 }
 
-void KalmanFilter::update(const Eigen::VectorXd& y) {
-
-    if(!initialized)
-        throw std::runtime_error("Filter is not initialized!");
-
-    x_hat_new = A * x_hat;
-    P = A * P * A.transpose() + Q;
-    K = P * C.transpose() * (C * P * C.transpose() + R).inverse();
-    x_hat_new += K * (y - C * x_hat_new);
-    P = (I - K * C) * P;
-    x_hat = x_hat_new;
-
-    t += dt;
+void KalmanFilter::check_observation_resonable()
+{
+    // Check if the observation is valid 
+    if (H_.rows()!= Z_.size() || H_.cols()!= X_.size())
+    {
+        observation_resonable_ = false;
+        return;
+    }
+    if (R_.rows() != Z_.size() || R_.cols() != Z_.size())
+    {
+        observation_resonable_ = false;
+        return;
+    }
+    observation_resonable_ = true;
 }
 
-void KalmanFilter::update(const Eigen::VectorXd& y, double dt, const Eigen::MatrixXd A) {
 
-    this->A = A;
-    this->dt = dt;
-    update(y);
+
+void KalmanFilter::predict()
+{
+    // Predict the state and covariance matrices
+    Eigen::MatrixXd Phik, Gk, Gammak;
+    Eigen::MatrixXd I;
+
+    if (!initialized_ || !system_resonable_) return;
+    I = Eigen::MatrixXd::Identity(X_.size(), X_.size());
+    time_stamp_ += delta_time_;
+
+    Phik = I + A_ * delta_time_;
+    Gk = B_ * delta_time_;
+    Gammak = F_ * delta_time_;
+
+    X_ = A_ * X_ + B_ * u_;
+    P_ = A_ * P_ * A_.transpose() + Q_;
 }
