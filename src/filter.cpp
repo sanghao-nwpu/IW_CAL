@@ -1,3 +1,11 @@
+/*
+ * @Author: moxiaosang_vec moxiaosang_vec@163.com
+ * @Date: 2024-03-28 23:22:59
+ * @LastEditors: moxiaosang_vec moxiaosang_vec@163.com
+ * @LastEditTime: 2024-04-05 21:36:58
+ * @FilePath: /IW_CAL/src/filter.cpp
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
 /**
 * Implementation of KalmanFilter class.
 *
@@ -73,7 +81,6 @@ void KalmanFilter::check_observation_resonable()
 }
 
 
-
 void KalmanFilter::predict()
 {
     // Predict the state and covariance matrices
@@ -88,6 +95,30 @@ void KalmanFilter::predict()
     Gk = B_ * delta_time_;
     Gammak = F_ * delta_time_;
 
-    X_ = A_ * X_ + B_ * u_;
+    if (!nonlinear_prediction_)
+    {
+        X_ = A_ * X_ + B_ * u_;
+    }
     P_ = A_ * P_ * A_.transpose() + Q_;
+}
+
+
+void KalmanFilter::update(const Eigen::VectorXd& Z)
+{
+    // Update the state and covariance matrices with the observation
+    Eigen::MatrixXd K, S, Ht, Vt;
+    Eigen::VectorXd y;
+    Eigen::MatrixXd I;
+
+    I = Eigen::MatrixXd::Identity(X_.size(), X_.size());
+
+    if (!initialized_ || !system_resonable_ || !observation_resonable_) return;
+
+
+    y = Z - H_ * X_;
+    S = H_ * P_ * H_.transpose() + R_;  /* Innovation covariance */
+    K = P_ * H_.transpose() * S.inverse();  /* Kalman gain */
+
+    X_ = X_ + K * y;
+    P_ = (I - K * H_) * P_;
 }
